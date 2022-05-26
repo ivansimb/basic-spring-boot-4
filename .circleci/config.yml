@@ -1,0 +1,72 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: cimg/openjdk:15.0.1
+    steps:
+      - checkout
+      - run:
+          command: find . -name 'pom.xml' | sort | xargs cat > /tmp/maven_cache_seed
+          working_directory: ~/project
+      - restore_cache:
+          key: circleci-java-maven-{{ checksum "/tmp/maven_cache_seed" }}
+      - run:
+          command: mvn clean install
+          working_directory: ~/project
+      - save_cache:
+          paths:
+            - ~/.m2/repository
+          key: circleci-java-maven-{{ checksum "/tmp/maven_cache_seed" }}
+      - store_test_results:
+          path: ~/project/target/testms-0.1.jar
+      - store_artifacts:
+          path: ~/project/target/testms-0.1.jar
+  deploy:
+    machine:
+      enabled: true
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "56:de:3a:2c:69:ca:92:7c:95:55:ee:2c:bb:75:66:bf"
+      - run:
+          name: Kill Existing Over SSH
+          command: |
+            ssh circleci@31.187.75.85 'bash -c cd /home/circleci && \
+            bash ./killprocess.sh'
+      - run:
+          name: Deploy Over SSH
+          command: |
+            ssh circleci@31.187.75.85 'bash -c cd /home/circleci && \
+            bash ./runningprocess.sh'
+  transfer:
+    machine:
+      enabled: true
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "56:de:3a:2c:69:ca:92:7c:95:55:ee:2c:bb:75:66:bf"
+      - run:
+          name: Delete Cache
+          command: |
+            ssh circleci@31.187.75.85 'bash -c cd /home/circleci && \
+            rm -R 0/ && \
+            rm steps-running-manual-if-failed.txt'
+      - run:
+          name: Transfer Jar
+          command: |
+            ssh circleci@31.187.75.85 'bash -c cd /home/circleci && \
+            rm -R logs/
+            args='$CIRCLE_PREVIOUS_BUILD_NUM'
+            bash ./download.sh ivansimb/basic-spring-boot-4 "${args}"'
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build
+      - transfer:
+          requires:
+            - build
+      - deploy:
+          requires:
+            - transfer
