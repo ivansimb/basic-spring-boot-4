@@ -43,7 +43,7 @@ public class CountryOfResidenceService extends BaseService{
         }
 
         CountryOfResidence cor = new CountryOfResidence();
-        cor.setCor("FINLAD");
+        cor.setCor("BULGARIA");
         cor.setUid("1");
         cor.setLanguageCode("EN");
         cor.setPublishFlag(true);
